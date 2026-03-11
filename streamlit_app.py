@@ -1,24 +1,46 @@
 import streamlit as st
 import requests
 
-st.title("AI Mental Wellness Diagnostic Bot")
+st.set_page_config(page_title="AI Mental Wellness Diagnostic Bot", layout="centered")
 
+st.title("AI Mental Wellness Diagnostic Bot")
 st.write("Talk with the AI diagnostic bot about your mental wellness.")
 
-user_input = st.text_input("How are you feeling today?")
+FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "content": "Hey, I’m here. What’s on your mind right now?"
+        }
+    ]
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+user_input = st.chat_input("Type your message here...")
 
 if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-    url = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-    payload = {
-        "question": user_input
-    }
+    payload = {"question": user_input}
 
-    response = requests.post(url, json=payload)
+    try:
+        response = requests.post(FLOWISE_URL, json=payload)
+        if response.status_code == 200:
+            result = response.json()
+            bot_reply = result.get("text", "I’m sorry, I could not generate a response.")
+        else:
+            bot_reply = "Error connecting to AI bot."
+    except Exception:
+        bot_reply = "Something went wrong while connecting to the AI bot."
 
-    if response.status_code == 200:
-        result = response.json()
-        st.write(result["text"])
-    else:
-        st.write("Error connecting to AI bot.")
+    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
+    with st.chat_message("assistant"):
+        st.markdown(bot_reply)
