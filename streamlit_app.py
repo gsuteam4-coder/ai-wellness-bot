@@ -34,7 +34,9 @@ if user_input:
 
     payload = {
         "question": user_input,
-        "sessionId": st.session_state.session_id
+        "overrideConfig": {
+            "sessionId": st.session_state.session_id
+        }
     }
 
     try:
