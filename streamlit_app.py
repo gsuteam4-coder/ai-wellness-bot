@@ -21,16 +21,16 @@ if st.session_state.step == 1:
     col1, col2, col3 = st.columns(3)
 
     if col1.button("A) Pressure about everything to finish"):
-    st.session_state.answers.append("pressure")
-    st.session_state.step = 2
+        st.session_state.answers.append("pressure")
+        st.session_state.step = 2
 
     if col2.button("B) Just tired like sleep wasn’t enough"):
-    st.session_state.answers.append("tired")
-    st.session_state.step = 2
+        st.session_state.answers.append("tired")
+        st.session_state.step = 2
 
     if col3.button("C) Heavy feeling, hard to start the day"):
-    st.session_state.answers.append("heavy")
-    st.session_state.step = 2
+        st.session_state.answers.append("heavy")
+        st.session_state.step = 2
 
 # QUESTION 2
 elif st.session_state.step == 2:
