@@ -1,71 +1,69 @@
 import streamlit as st
-import requests
-from streamlit_mic_recorder import mic_recorder
-from gtts import gTTS
-import tempfile
 
-st.set_page_config(page_title="AI Mental Wellness Support Bot")
+st.title("Mental Wellness Simulation")
 
-st.title("Aanya — Your Support Companion")
+# Patient scenario
+st.write("Patient: Alex")
+st.write("Alex is a college student who works part-time and has been feeling overwhelmed recently.")
 
-FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+# Initialize session state
+if "step" not in st.session_state:
+    st.session_state.step = 1
 
-# Session memory
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hey... I'm here. What's on your mind today?"}
-    ]
+# QUESTION 1
+if st.session_state.step == 1:
 
-# Show chat history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+    st.write("Aanya: When Alex wakes up in the morning, what feeling appears first?")
 
-# TEXT INPUT
-user_input = st.chat_input("Type your message here...")
+    col1, col2, col3 = st.columns(3)
 
-# MICROPHONE INPUT
-st.write("Or speak to Aanya")
+    if col1.button("A) Pressure about everything to finish"):
+        st.session_state.step = 2
 
-audio = mic_recorder(
-    start_prompt="🎤 Start Recording",
-    stop_prompt="⏹ Stop Recording",
-    just_once=True
-)
+    if col2.button("B) Just tired like sleep wasn’t enough"):
+        st.session_state.step = 2
 
-# If voice recorded
-if audio:
-    st.audio(audio["bytes"])
+    if col3.button("C) Heavy feeling, hard to start the day"):
+        st.session_state.step = 2
 
-# Process text input
-if user_input:
+# QUESTION 2
+elif st.session_state.step == 2:
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.write("Aanya: How does Alex usually feel during the day?")
 
-    with st.chat_message("user"):
-        st.write(user_input)
+    col1, col2, col3 = st.columns(3)
 
-    payload = {"question": user_input}
+    if col1.button("A) Constant pressure"):
+        st.session_state.step = 3
 
-    try:
-        with st.spinner("Aanya is thinking..."):
-            response = requests.post(FLOWISE_URL, json=payload)
+    if col2.button("B) Low energy"):
+        st.session_state.step = 3
 
-        result = response.json()
-        bot_reply = result.get("text") or result.get("answer")
+    if col3.button("C) Mentally exhausted"):
+        st.session_state.step = 3
 
-    except:
-        bot_reply = "Something went wrong."
+# QUESTION 3
+elif st.session_state.step == 3:
 
-    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+    st.write("Aanya: What happens in the evening?")
 
-    with st.chat_message("assistant"):
-        st.write(bot_reply)
+    col1, col2, col3 = st.columns(3)
 
-    # TEXT → SPEECH
-    tts = gTTS(bot_reply)
+    if col1.button("A) Overthinking about tasks"):
+        st.session_state.step = 4
 
-    audio_file = tempfile.NamedTemporaryFile(delete=False)
-    tts.save(audio_file.name)
+    if col2.button("B) Feeling drained"):
+        st.session_state.step = 4
 
-    st.audio(audio_file.name)
+    if col3.button("C) Just wanting to escape everything"):
+        st.session_state.step = 4
+
+# FINAL MESSAGE
+elif st.session_state.step == 4:
+
+    st.write("Aanya:")
+    st.write(
+        "It seems like Alex has been carrying a lot of pressure throughout the day. "
+        "Starting the morning already feeling overwhelmed can slowly drain energy and motivation. "
+        "Sometimes beginning the day with just one small task can help create a sense of control and momentum."
+    )
