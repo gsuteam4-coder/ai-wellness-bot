@@ -1,128 +1,112 @@
 import streamlit as st
+import requests
+import uuid
 
-st.set_page_config(page_title="AI Persona Simulation")
+st.set_page_config(page_title="AI Mental Wellness Diagnostic Bot", layout="centered")
 
-st.title("AI Persona Simulation")
-st.caption("Patient Bot interacting with Aanya — Diagnostic Companion")
+st.title("AI Mental Wellness Diagnostic Bot")
+st.write("Choose a persona and interact with the AI diagnostic system.")
 
-# Patient introduction
-with st.chat_message("user"):
-    st.write("Hi... I'm Alex. Lately my days feel overwhelming and I’m not sure why.")
+FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
 
-# Initialize session state
-if "step" not in st.session_state:
-    st.session_state.step = 1
+# Personas
+personas = {
+    "Alex – College Student with Anxiety": {
+        "age": 22,
+        "problem": "exam stress, overthinking, poor sleep",
+        "routine": "classes, part-time job, studies late, skips breakfast"
+    },
+    "Maya – Working Professional with Burnout": {
+        "age": 29,
+        "problem": "burnout, exhaustion, emotional overload",
+        "routine": "long office hours, constant meetings, little rest"
+    },
+    "Ravi – Remote Worker with Loneliness": {
+        "age": 26,
+        "problem": "isolation, low motivation, disconnected feeling",
+        "routine": "works from home, little social contact, irregular sleep"
+    },
+    "Sara – Entrepreneur with Sleep Stress": {
+        "age": 31,
+        "problem": "stress, insomnia, constant pressure",
+        "routine": "late-night work, high caffeine, always thinking about business"
+    }
+}
 
-if "answers" not in st.session_state:
-    st.session_state.answers = []
+# Persona selection
+selected_persona = st.selectbox("Choose a persona", list(personas.keys()))
+persona_info = personas[selected_persona]
 
-# -------------------------
-# QUESTION 1
-# -------------------------
-if st.session_state.step == 1:
+# Show persona details
+st.markdown("### Persona Details")
+st.write(f"**Age:** {persona_info['age']}")
+st.write(f"**Main Problem:** {persona_info['problem']}")
+st.write(f"**Routine:** {persona_info['routine']}")
 
-    with st.chat_message("assistant"):
-        st.write("When Alex wakes up in the morning, what feeling appears first?")
+# Session ID
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
-    col1, col2, col3 = st.columns(3)
+# Chat history reset when persona changes
+if "current_persona" not in st.session_state:
+    st.session_state.current_persona = selected_persona
+    st.session_state.messages = []
 
-    if col1.button("A) Pressure about everything to finish"):
-        st.session_state.answers.append("pressure")
-        st.session_state.step = 2
+if selected_persona != st.session_state.current_persona:
+    st.session_state.current_persona = selected_persona
+    st.session_state.messages = []
 
-    if col2.button("B) Just tired like sleep wasn’t enough"):
-        st.session_state.answers.append("tired")
-        st.session_state.step = 2
+# Initial message
+if not st.session_state.messages:
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": f"You are now interacting with {selected_persona}. Describe how you feel today."
+    })
 
-    if col3.button("C) Heavy feeling, hard to start the day"):
-        st.session_state.answers.append("heavy")
-        st.session_state.step = 2
+# Display chat
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
+# Input
+user_input = st.chat_input("Type your response here...")
 
-# -------------------------
-# QUESTION 2
-# -------------------------
-elif st.session_state.step == 2:
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-    with st.chat_message("assistant"):
-        st.write("How does Alex usually feel during the day?")
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-    col1, col2, col3 = st.columns(3)
+    # Persona context
+    persona_context = f"""
+Persona: {selected_persona}
+Age: {persona_info['age']}
+Main problem: {persona_info['problem']}
+Routine: {persona_info['routine']}
 
-    if col1.button("A) Constant pressure"):
-        st.session_state.answers.append("pressure_day")
-        st.session_state.step = 3
+User says: {user_input}
+"""
 
-    if col2.button("B) Low energy"):
-        st.session_state.answers.append("low_energy")
-        st.session_state.step = 3
+    payload = {
+        "question": persona_context,
+        "overrideConfig": {
+            "sessionId": st.session_state.session_id
+        }
+    }
 
-    if col3.button("C) Mentally exhausted"):
-        st.session_state.answers.append("mental_exhaustion")
-        st.session_state.step = 3
+    try:
+        response = requests.post(FLOWISE_URL, json=payload)
 
+        if response.status_code == 200:
+            result = response.json()
+            bot_reply = result.get("text", "No response generated.")
+        else:
+            bot_reply = f"Error: {response.status_code}"
 
-# -------------------------
-# QUESTION 3
-# -------------------------
-elif st.session_state.step == 3:
+    except Exception as e:
+        bot_reply = f"Connection error: {e}"
 
-    with st.chat_message("assistant"):
-        st.write("What usually happens in the evening?")
-
-    col1, col2, col3 = st.columns(3)
-
-    if col1.button("A) Overthinking about tasks"):
-        st.session_state.answers.append("overthinking")
-        st.session_state.step = 4
-
-    if col2.button("B) Feeling drained"):
-        st.session_state.answers.append("drained")
-        st.session_state.step = 4
-
-    if col3.button("C) Wanting to escape everything"):
-        st.session_state.answers.append("escape")
-        st.session_state.step = 4
-
-
-# -------------------------
-# FINAL ANALYSIS
-# -------------------------
-elif st.session_state.step == 4:
-
-    answers = st.session_state.answers
-
-    if "pressure" in answers or "pressure_day" in answers:
-        message = (
-            "It seems Alex may be carrying a lot of pressure throughout the day. "
-            "Starting the morning already thinking about unfinished tasks can slowly drain energy and motivation."
-        )
-
-    elif "tired" in answers or "low_energy" in answers:
-        message = (
-            "It looks like Alex may be struggling with low energy and not feeling properly rested. "
-            "When sleep and recovery are not enough, the whole day can feel heavier than it should."
-        )
-
-    else:
-        message = (
-            "Alex may be feeling emotionally drained and mentally overwhelmed. "
-            "When thoughts keep circling and there’s no space to slow down, it can make everything feel exhausting."
-        )
+    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
 
     with st.chat_message("assistant"):
-        st.write(message)
-        st.write(
-            "Sometimes beginning the day with one small manageable task can help create a sense of control and momentum."
-        )
-
-
-# -------------------------
-# RESTART BUTTON
-# -------------------------
-st.write("---")
-
-if st.button("Restart Simulation"):
-    st.session_state.step = 1
-    st.session_state.answers = []
-    st.rerun()
+        st.markdown(bot_reply)
