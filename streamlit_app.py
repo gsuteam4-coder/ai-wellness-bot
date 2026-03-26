@@ -2,40 +2,49 @@ import streamlit as st
 import requests
 import uuid
 
-st.set_page_config(page_title="AI Mental Wellness Diagnostic Bot", layout="centered")
+st.set_page_config(page_title="AI Mental Wellness Simulation", layout="centered")
 
 FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
 
-st.title("AI Mental Wellness Diagnostic Bot")
-st.write("This demo uses one fixed patient persona.")
+st.title("🧠 AI Mental Wellness Simulation")
+st.write("Experience an AI-driven diagnostic simulation for mental wellness.")
 
-# Fixed patient persona
+# Fixed Persona
 persona_name = "Alex"
 persona_age = 22
 persona_problem = "exam stress, overthinking, poor sleep"
 persona_routine = "classes, part-time job, studies late, skips breakfast"
 
-st.markdown("### Patient Persona")
+st.markdown("### 👤 Patient Persona")
 st.write(f"**Name:** {persona_name}")
 st.write(f"**Age:** {persona_age}")
 st.write(f"**Main Problem:** {persona_problem}")
 st.write(f"**Routine:** {persona_routine}")
 
+# Reset Button
+if st.button("🔄 Restart Simulation"):
+    st.session_state.clear()
+    st.rerun()
+
+# Session ID
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
+# Chat memory
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "You are now interacting with Alex. Describe how Alex is feeling today."
+            "content": "🎮 Simulation started. Alex is entering the diagnostic session. Describe how Alex is feeling right now."
         }
     ]
 
+# Display chat
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# Input
 user_input = st.chat_input("Type Alex's response here...")
 
 if user_input:
@@ -44,6 +53,7 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
+    # Persona context
     persona_context = f"""
 Patient Persona:
 Name: {persona_name}
