@@ -4,12 +4,11 @@ import uuid
 
 st.set_page_config(page_title="AI Mental Wellness Diagnostic Bot", layout="centered")
 
-FLOWISE_URL = "https://cloud.flowiseai.com/canvas/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
 
 st.title("AI Mental Wellness Diagnostic Bot")
 st.write("Choose a persona and interact with the AI diagnostic system.")
 
-# Personas
 personas = {
     "Alex – College Student with Anxiety": {
         "age": 22,
@@ -33,21 +32,17 @@ personas = {
     }
 }
 
-# Persona selection
 selected_persona = st.selectbox("Choose a persona", list(personas.keys()))
 persona_info = personas[selected_persona]
 
-# Show persona details
 st.markdown("### Persona Details")
 st.write(f"**Age:** {persona_info['age']}")
 st.write(f"**Main Problem:** {persona_info['problem']}")
 st.write(f"**Routine:** {persona_info['routine']}")
 
-# Session id for Flowise memory
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-# Reset chat when persona changes
 if "current_persona" not in st.session_state:
     st.session_state.current_persona = selected_persona
     st.session_state.messages = []
@@ -57,19 +52,16 @@ if selected_persona != st.session_state.current_persona:
     st.session_state.messages = []
     st.session_state.session_id = str(uuid.uuid4())
 
-# First assistant message
 if not st.session_state.messages:
     st.session_state.messages.append({
         "role": "assistant",
         "content": f"You are now interacting with {selected_persona}. Describe how you feel today."
     })
 
-# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
 user_input = st.chat_input("Type your response here...")
 
 if user_input:
@@ -97,11 +89,21 @@ Current message: {user_input}
     try:
         response = requests.post(FLOWISE_URL, json=payload, timeout=60)
 
+        st.write("Raw response:", response.text)
+
         if response.status_code == 200:
-            result = response.json()
-            bot_reply = result.get("text", "No response generated.")
+            try:
+                result = response.json()
+                bot_reply = (
+                    result.get("text") or
+                    result.get("answer") or
+                    result.get("output") or
+                    str(result)
+                )
+            except:
+                bot_reply = "Error: Could not parse JSON response"
         else:
-            bot_reply = f"Error: {response.status_code} - {response.text}"
+            bot_reply = f"Error {response.status_code}: {response.text}"
 
     except Exception as e:
         bot_reply = f"Connection error: {e}"
