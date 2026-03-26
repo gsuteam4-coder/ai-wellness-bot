@@ -1,57 +1,72 @@
 import streamlit as st
-from openai import OpenAI
+import requests
+import uuid
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+st.set_page_config(page_title="Aanya - AI Companion", layout="centered")
 
-st.title("Aanya 💚")
-st.write("Talk to someone who listens...")
+FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
 
-# Session states
+st.title("💚 Aanya - Your AI Companion")
+st.caption("Talk freely. Aanya is here to listen.")
+
+# Restart button
+if st.button("🔄 Restart Conversation"):
+    st.session_state.clear()
+    st.rerun()
+
+# Session ID for memory
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+# Chat memory
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "content": "Hey… I'm here with you 😊 What's been on your mind lately?"
+        }
+    ]
 
-if "step" not in st.session_state:
-    st.session_state.step = 0
-
-# Questions + options
-flow = [
-    ("How has your daily life been lately?", ["Busy", "Normal", "Very stressful"]),
-    ("How has your sleep been lately?", ["Good", "Okay", "Bad"]),
-    ("Are you eating okay these days?", ["Yes", "Sometimes skip", "Not really"]),
-    ("How are things going with work or study?", ["Going well", "Struggling", "Overwhelmed"]),
-    ("How are your relationships?", ["Good", "Okay", "Difficult"]),
-    ("How has your mood been recently?", ["Happy", "Up and down", "Low"]),
-    ("What do you do when things feel heavy?", ["Talk to someone", "Distract myself", "Nothing"])
-]
-
-# Show chat history
+# Display chat
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-step = st.session_state.step
+# User input
+user_input = st.chat_input("Type how you're feeling...")
 
-# Show current question
-if step < len(flow):
-    question, options = flow[step]
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-    st.chat_message("assistant").write(
-        f"That makes sense 💚\n{question}"
-    )
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-    # Clickable options
-    choice = st.radio("Choose one:", options, key=f"q{step}")
+    # Send ONLY user message (no persona context)
+    payload = {
+        "question": user_input,
+        "overrideConfig": {
+            "sessionId": st.session_state.session_id
+        }
+    }
 
-    if st.button("Next"):
-        st.session_state.messages.append({"role": "user", "content": choice})
-        st.session_state.step += 1
-        st.rerun()
+    try:
+        response = requests.post(FLOWISE_URL, json=payload, timeout=60)
 
-else:
-    # Final result
-    st.chat_message("assistant").write(
-        "Result: Moderate\n\n"
-        "• Try to get small breaks in your day\n"
-        "• Talk to someone you trust\n"
-        "• Keep a simple daily routine\n\n"
-        "💚 I'm an AI companion, not a real therapist. Please reach out to a professional if things feel heavy."
-    )
+        if response.status_code == 200:
+            result = response.json()
+            bot_reply = (
+                result.get("text")
+                or result.get("answer")
+                or result.get("output")
+                or "Hmm… something feels off. Can you try again?"
+            )
+        else:
+            bot_reply = f"Something went wrong ({response.status_code})."
+
+    except Exception:
+        bot_reply = "I couldn't reach the server… try again in a moment 💚"
+
+    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
+    with st.chat_message("assistant"):
+        st.markdown(bot_reply)
