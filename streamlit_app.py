@@ -4,10 +4,10 @@ import uuid
 
 st.set_page_config(page_title="AI Mental Wellness Diagnostic Bot", layout="centered")
 
+FLOWISE_URL = "https://cloud.flowiseai.com/canvas/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+
 st.title("AI Mental Wellness Diagnostic Bot")
 st.write("Choose a persona and interact with the AI diagnostic system.")
-
-FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
 
 # Personas
 personas = {
@@ -43,11 +43,11 @@ st.write(f"**Age:** {persona_info['age']}")
 st.write(f"**Main Problem:** {persona_info['problem']}")
 st.write(f"**Routine:** {persona_info['routine']}")
 
-# Session ID
+# Session id for Flowise memory
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-# Chat history reset when persona changes
+# Reset chat when persona changes
 if "current_persona" not in st.session_state:
     st.session_state.current_persona = selected_persona
     st.session_state.messages = []
@@ -55,20 +55,21 @@ if "current_persona" not in st.session_state:
 if selected_persona != st.session_state.current_persona:
     st.session_state.current_persona = selected_persona
     st.session_state.messages = []
+    st.session_state.session_id = str(uuid.uuid4())
 
-# Initial message
+# First assistant message
 if not st.session_state.messages:
     st.session_state.messages.append({
         "role": "assistant",
         "content": f"You are now interacting with {selected_persona}. Describe how you feel today."
     })
 
-# Display chat
+# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input
+# User input
 user_input = st.chat_input("Type your response here...")
 
 if user_input:
@@ -77,14 +78,13 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Persona context
     persona_context = f"""
 Persona: {selected_persona}
 Age: {persona_info['age']}
 Main problem: {persona_info['problem']}
 Routine: {persona_info['routine']}
 
-User says: {user_input}
+Current message: {user_input}
 """
 
     payload = {
@@ -95,13 +95,13 @@ User says: {user_input}
     }
 
     try:
-        response = requests.post(FLOWISE_URL, json=payload)
+        response = requests.post(FLOWISE_URL, json=payload, timeout=60)
 
         if response.status_code == 200:
             result = response.json()
             bot_reply = result.get("text", "No response generated.")
         else:
-            bot_reply = f"Error: {response.status_code}"
+            bot_reply = f"Error: {response.status_code} - {response.text}"
 
     except Exception as e:
         bot_reply = f"Connection error: {e}"
