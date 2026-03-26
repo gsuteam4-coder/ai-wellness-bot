@@ -9,6 +9,7 @@ FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-
 st.title("AI Mental Wellness Diagnostic Bot")
 st.write("Choose a persona and interact with the AI diagnostic system.")
 
+# Personas
 personas = {
     "Alex – College Student with Anxiety": {
         "age": 22,
@@ -32,17 +33,21 @@ personas = {
     }
 }
 
+# Select persona
 selected_persona = st.selectbox("Choose a persona", list(personas.keys()))
 persona_info = personas[selected_persona]
 
+# Show details
 st.markdown("### Persona Details")
 st.write(f"**Age:** {persona_info['age']}")
 st.write(f"**Main Problem:** {persona_info['problem']}")
 st.write(f"**Routine:** {persona_info['routine']}")
 
+# Session memory
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
+# Reset chat if persona changes
 if "current_persona" not in st.session_state:
     st.session_state.current_persona = selected_persona
     st.session_state.messages = []
@@ -52,16 +57,19 @@ if selected_persona != st.session_state.current_persona:
     st.session_state.messages = []
     st.session_state.session_id = str(uuid.uuid4())
 
+# First message
 if not st.session_state.messages:
     st.session_state.messages.append({
         "role": "assistant",
         "content": f"You are now interacting with {selected_persona}. Describe how you feel today."
     })
 
+# Display chat
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# User input
 user_input = st.chat_input("Type your response here...")
 
 if user_input:
@@ -70,6 +78,7 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
+    # Persona context sent to Flowise
     persona_context = f"""
 Persona: {selected_persona}
 Age: {persona_info['age']}
@@ -89,8 +98,6 @@ Current message: {user_input}
     try:
         response = requests.post(FLOWISE_URL, json=payload, timeout=60)
 
-        st.write("Raw response:", response.text)
-
         if response.status_code == 200:
             try:
                 result = response.json()
@@ -98,10 +105,10 @@ Current message: {user_input}
                     result.get("text") or
                     result.get("answer") or
                     result.get("output") or
-                    str(result)
+                    "No response generated."
                 )
             except:
-                bot_reply = "Error: Could not parse JSON response"
+                bot_reply = "Error: Could not parse response"
         else:
             bot_reply = f"Error {response.status_code}: {response.text}"
 
