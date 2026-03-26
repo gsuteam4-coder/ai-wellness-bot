@@ -42,12 +42,12 @@ if user_input:
         st.markdown(user_input)
 
     # Send ONLY user message (no persona context)
-    payload = {
-        "question": user_input,
-        "overrideConfig": {
-            "sessionId": st.session_state.session_id
-        }
+   payload = {
+    "question": user_input.strip(),
+    "overrideConfig": {
+        "sessionId": st.session_state.session_id
     }
+}
 
     try:
         response = requests.post(FLOWISE_URL, json=payload, timeout=60)
