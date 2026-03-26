@@ -1,95 +1,57 @@
 import streamlit as st
-import requests
-import uuid
+from openai import OpenAI
 
-st.set_page_config(page_title="AI Mental Wellness Simulation", layout="centered")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-FLOWISE_URL = "https://cloud.flowiseai.com/api/v1/prediction/7b60721f-874f-4f0a-a811-ca1f43c0d1fd"
+st.title("Aanya 💚")
+st.write("Talk to someone who listens...")
 
-st.title("🧠 AI Mental Wellness Simulation")
-st.caption("Version 2 - fixed patient simulation")
-
-st.write("This is a diagnostic simulation for one patient persona.")
-
-# Fixed patient persona
-persona_name = "Alex"
-persona_age = 22
-persona_problem = "exam stress, overthinking, poor sleep"
-persona_routine = "classes, part-time job, studies late, skips breakfast"
-
-st.markdown("### 👤 Patient Persona")
-st.write(f"**Name:** {persona_name}")
-st.write(f"**Age:** {persona_age}")
-st.write(f"**Main Problem:** {persona_problem}")
-st.write(f"**Routine:** {persona_routine}")
-
-# Restart simulation button
-if st.button("🔄 Restart Simulation"):
-    st.session_state.clear()
-    st.rerun()
-
-# Create session id once
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-
-# Start messages once
+# Session states
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "🎮 Simulation started. Alex is entering the diagnostic session. Describe how Alex is feeling right now."
-        }
-    ]
+    st.session_state.messages = []
+
+if "step" not in st.session_state:
+    st.session_state.step = 0
+
+# Questions + options
+flow = [
+    ("How has your daily life been lately?", ["Busy", "Normal", "Very stressful"]),
+    ("How has your sleep been lately?", ["Good", "Okay", "Bad"]),
+    ("Are you eating okay these days?", ["Yes", "Sometimes skip", "Not really"]),
+    ("How are things going with work or study?", ["Going well", "Struggling", "Overwhelmed"]),
+    ("How are your relationships?", ["Good", "Okay", "Difficult"]),
+    ("How has your mood been recently?", ["Happy", "Up and down", "Low"]),
+    ("What do you do when things feel heavy?", ["Talk to someone", "Distract myself", "Nothing"])
+]
 
 # Show chat history
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    st.chat_message(msg["role"]).write(msg["content"])
 
-# Chat input
-user_input = st.chat_input("Type Alex's response here...")
+step = st.session_state.step
 
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
+# Show current question
+if step < len(flow):
+    question, options = flow[step]
 
-    with st.chat_message("user"):
-        st.markdown(user_input)
+    st.chat_message("assistant").write(
+        f"That makes sense 💚\n{question}"
+    )
 
-    persona_context = f"""
-Patient Persona:
-Name: {persona_name}
-Age: {persona_age}
-Main Problem: {persona_problem}
-Routine: {persona_routine}
+    # Clickable options
+    choice = st.radio("Choose one:", options, key=f"q{step}")
 
-Current Message: {user_input}
-"""
+    if st.button("Next"):
+        st.session_state.messages.append({"role": "user", "content": choice})
+        st.session_state.step += 1
+        st.rerun()
 
-    payload = {
-        "question": persona_context,
-        "overrideConfig": {
-            "sessionId": st.session_state.session_id
-        }
-    }
-
-    try:
-        response = requests.post(FLOWISE_URL, json=payload, timeout=60)
-
-        if response.status_code == 200:
-            result = response.json()
-            bot_reply = (
-                result.get("text")
-                or result.get("answer")
-                or result.get("output")
-                or "No response generated."
-            )
-        else:
-            bot_reply = f"Error {response.status_code}: {response.text}"
-
-    except Exception as e:
-        bot_reply = f"Connection error: {e}"
-
-    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-
-    with st.chat_message("assistant"):
-        st.markdown(bot_reply)
+else:
+    # Final result
+    st.chat_message("assistant").write(
+        "Result: Moderate\n\n"
+        "• Try to get small breaks in your day\n"
+        "• Talk to someone you trust\n"
+        "• Keep a simple daily routine\n\n"
+        "💚 I'm an AI companion, not a real therapist. Please reach out to a professional if things feel heavy."
+    )
