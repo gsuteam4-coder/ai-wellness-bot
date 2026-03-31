@@ -59,7 +59,7 @@ if st.button("🔄 Restart Simulation"):
 
 if not st.session_state.started:
     if st.button("▶ Start Simulation"):
-        first_output = call_flowise("start", st.session_state.session_id)
+        first_output = call_flowise("Start the simulation", st.session_state.session_id)
         st.session_state.history.append(first_output)
         st.session_state.started = True
         st.rerun()
