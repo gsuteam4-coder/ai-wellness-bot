@@ -21,13 +21,14 @@ def extract_options(text: str):
     for line in lines:
         clean = line.strip()
 
-        # match lines like:
-        # A) something
-        # B) something
-        # C) something
-        m = re.match(r"^([ABC])\)\s+(.*)$", clean)
+        # Matches:
+        # A) text
+        # A)text
+        # A : text
+        # A. text
+        m = re.match(r"^([ABC])[\)\.\:\-]\s*(.+)$", clean, flags=re.IGNORECASE)
         if m:
-            letter = m.group(1)
+            letter = m.group(1).upper()
             option_text = m.group(2).strip()
             options.append((letter, option_text))
 
@@ -109,3 +110,5 @@ if st.session_state.history:
                         st.rerun()
         else:
             st.info("No options found in the latest response.")
+            with st.expander("Debug latest response"):
+                st.code(latest)
