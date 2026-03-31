@@ -15,8 +15,23 @@ st.caption("Choose a path and see how the story unfolds.")
 client = Flowise(base_url=BASE_URL)
 
 def extract_options(text: str):
-    pattern = r'^\s*([ABC])\)\s*(.+)$'
-    return re.findall(pattern, text, flags=re.MULTILINE)
+    lines = text.splitlines()
+    options = []
+
+    for line in lines:
+        clean = line.strip()
+
+        # match lines like:
+        # A) something
+        # B) something
+        # C) something
+        m = re.match(r"^([ABC])\)\s+(.*)$", clean)
+        if m:
+            letter = m.group(1)
+            option_text = m.group(2).strip()
+            options.append((letter, option_text))
+
+    return options
 
 def is_final_result(text: str) -> bool:
     upper_text = text.upper()
@@ -43,16 +58,16 @@ def stream_flowise(user_message: str, session_id: str):
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-if "history" not in st.session_state:
-    st.session_state.history = []
-
 if "started" not in st.session_state:
     st.session_state.started = False
 
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 if st.button("🔄 Restart Simulation"):
     st.session_state.session_id = str(uuid.uuid4())
-    st.session_state.history = []
     st.session_state.started = False
+    st.session_state.history = []
     st.rerun()
 
 if not st.session_state.started:
@@ -69,19 +84,19 @@ for item in st.session_state.history:
     st.markdown(item)
     st.divider()
 
-if st.session_state.started and st.session_state.history:
-    latest_output = st.session_state.history[-1]
+if st.session_state.history:
+    latest = st.session_state.history[-1]
 
-    if not is_final_result(latest_output):
-        options = extract_options(latest_output)
+    if not is_final_result(latest):
+        options = extract_options(latest)
 
         if options:
             st.markdown("### Choose what happens next")
 
             cols = st.columns(len(options))
 
-            for i, (letter, option_text) in enumerate(options):
-                with cols[i]:
+            for idx, (letter, option_text) in enumerate(options):
+                with cols[idx]:
                     if st.button(
                         f"{letter}) {option_text}",
                         key=f"{letter}_{len(st.session_state.history)}"
