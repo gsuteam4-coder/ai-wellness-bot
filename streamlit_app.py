@@ -29,10 +29,12 @@ PERSONAS = {
     }
 }
 
+
 def normalize_text(text: str) -> str:
     if not text:
         return ""
     return text.replace("\r\n", "\n").replace("\r", "\n")
+
 
 def extract_options(text: str):
     text = normalize_text(text)
@@ -79,9 +81,11 @@ def extract_options(text: str):
 
     return []
 
+
 def is_final_result(text: str) -> bool:
     upper = text.upper()
     return "FINAL RESULT" in upper or "WELLNESS LEVEL" in upper
+
 
 def stream_flowise(user_message: str, session_id: str):
     completion = client.create_prediction(
@@ -101,6 +105,7 @@ def stream_flowise(user_message: str, session_id: str):
         except Exception:
             continue
 
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
@@ -113,12 +118,14 @@ if "history" not in st.session_state:
 if "selected_persona" not in st.session_state:
     st.session_state.selected_persona = None
 
+
 if st.button("🔄 Restart Simulation"):
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.started = False
     st.session_state.history = []
     st.session_state.selected_persona = None
     st.rerun()
+
 
 if not st.session_state.selected_persona:
     st.markdown("## Choose a persona")
@@ -150,6 +157,7 @@ if not st.session_state.selected_persona:
 else:
     st.success(f"Selected persona: {PERSONAS[st.session_state.selected_persona]['title']}")
 
+
 if not st.session_state.started:
     if st.button("▶ Start Simulation"):
         start_prompt = (
@@ -166,9 +174,20 @@ if not st.session_state.started:
         st.session_state.started = True
         st.rerun()
 
-for item in st.session_state.history:
+
+for idx, item in enumerate(st.session_state.history):
+    round_match = re.search(r"ROUND\s+(\d+)", item, flags=re.IGNORECASE)
+    if round_match:
+        round_num = int(round_match.group(1))
+        st.markdown(f"## 🟢 Round {round_num}")
+        st.progress(round_num / 4)
+
+    if "FINAL RESULT" in item.upper():
+        st.markdown("## 🌟 Final Reflection")
+
     st.markdown(item)
     st.divider()
+
 
 if st.session_state.history:
     latest = st.session_state.history[-1]
@@ -177,12 +196,13 @@ if st.session_state.history:
         options = extract_options(latest)
 
         if options:
-            st.markdown("### Choose what happens next")
+            st.markdown("### ✨ What would you do in this moment?")
 
             cols = st.columns(3)
 
             for idx, (letter, option_text) in enumerate(options):
                 with cols[idx]:
+                    st.markdown(f"**Option {letter}**")
                     if st.button(
                         option_text,
                         key=f"{letter}_{len(st.session_state.history)}",
