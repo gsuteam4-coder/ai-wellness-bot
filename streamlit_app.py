@@ -10,33 +10,78 @@ BASE_URL = "https://cloud.flowiseai.com"
 FLOW_ID = "fd821f6f-939f-4b5c-89b4-910760fcb0f8"
 
 st.title("💚 Aanya Wellness Simulation")
-st.caption("Choose a path and see how the story unfolds.")
+st.caption("Choose a persona and explore their story.")
 
 client = Flowise(base_url=BASE_URL)
 
+PERSONAS = {
+    "Malik": {
+        "title": "Malik — Social Anxiety",
+        "summary": "Malik struggles with group events, overthinking, and fear of judgment."
+    },
+    "Rina": {
+        "title": "Rina — Caregiver Burnout",
+        "summary": "Rina is emotionally drained from always caring for others and neglecting herself."
+    },
+    "Ava": {
+        "title": "Ava — Chronic Pain",
+        "summary": "Ava lives with ongoing pain, low energy, and frustration from not feeling understood."
+    }
+}
+
+def normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
 def extract_options(text: str):
-    lines = text.splitlines()
+    text = normalize_text(text)
+
+    marker = "Choose what happens next:"
+    idx = text.lower().find(marker.lower())
+    if idx == -1:
+        return []
+
+    choice_part = text[idx + len(marker):].strip()
+
+    block_match = re.search(
+        r"A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*)",
+        choice_part,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    if block_match:
+        a_text = " ".join(block_match.group(1).split())
+        b_text = " ".join(block_match.group(2).split())
+        c_text = " ".join(block_match.group(3).split())
+
+        c_text = re.split(
+            r"FINAL RESULT|ROUND\s+\d+",
+            c_text,
+            maxsplit=1,
+            flags=re.IGNORECASE
+        )[0].strip()
+
+        c_text = " ".join(c_text.split())
+
+        if a_text and b_text and c_text:
+            return [("A", a_text), ("B", b_text), ("C", c_text)]
+
     options = []
-
-    for line in lines:
+    for line in choice_part.splitlines():
         clean = line.strip()
-
-        # Matches:
-        # A) text
-        # A)text
-        # A : text
-        # A. text
         m = re.match(r"^([ABC])[\)\.\:\-]\s*(.+)$", clean, flags=re.IGNORECASE)
         if m:
-            letter = m.group(1).upper()
-            option_text = m.group(2).strip()
-            options.append((letter, option_text))
+            options.append((m.group(1).upper(), m.group(2).strip()))
 
-    return options
+    if len(options) == 3:
+        return options
+
+    return []
 
 def is_final_result(text: str) -> bool:
-    upper_text = text.upper()
-    return "FINAL RESULT" in upper_text or "WELLNESS LEVEL" in upper_text
+    upper = text.upper()
+    return "FINAL RESULT" in upper or "WELLNESS LEVEL" in upper
 
 def stream_flowise(user_message: str, session_id: str):
     completion = client.create_prediction(
@@ -65,18 +110,58 @@ if "started" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "selected_persona" not in st.session_state:
+    st.session_state.selected_persona = None
+
 if st.button("🔄 Restart Simulation"):
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.started = False
     st.session_state.history = []
+    st.session_state.selected_persona = None
     st.rerun()
+
+if not st.session_state.selected_persona:
+    st.markdown("## Choose a persona")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(f"### {PERSONAS['Malik']['title']}")
+        st.write(PERSONAS["Malik"]["summary"])
+        if st.button("Choose Malik"):
+            st.session_state.selected_persona = "Malik"
+            st.rerun()
+
+    with col2:
+        st.markdown(f"### {PERSONAS['Rina']['title']}")
+        st.write(PERSONAS["Rina"]["summary"])
+        if st.button("Choose Rina"):
+            st.session_state.selected_persona = "Rina"
+            st.rerun()
+
+    with col3:
+        st.markdown(f"### {PERSONAS['Ava']['title']}")
+        st.write(PERSONAS["Ava"]["summary"])
+        if st.button("Choose Ava"):
+            st.session_state.selected_persona = "Ava"
+            st.rerun()
+
+    st.stop()
+else:
+    st.success(f"Selected persona: {PERSONAS[st.session_state.selected_persona]['title']}")
 
 if not st.session_state.started:
     if st.button("▶ Start Simulation"):
+        start_prompt = (
+            f"Start the simulation for persona: {st.session_state.selected_persona}. "
+            f"Persona summary: {PERSONAS[st.session_state.selected_persona]['summary']}"
+        )
+
         with st.spinner("Starting simulation..."):
             full_response = st.write_stream(
-                stream_flowise("Start the simulation", st.session_state.session_id)
+                stream_flowise(start_prompt, st.session_state.session_id)
             )
+
         st.session_state.history.append(full_response)
         st.session_state.started = True
         st.rerun()
@@ -94,13 +179,14 @@ if st.session_state.history:
         if options:
             st.markdown("### Choose what happens next")
 
-            cols = st.columns(len(options))
+            cols = st.columns(3)
 
             for idx, (letter, option_text) in enumerate(options):
                 with cols[idx]:
                     if st.button(
-                        f"{letter}) {option_text}",
-                        key=f"{letter}_{len(st.session_state.history)}"
+                        option_text,
+                        key=f"{letter}_{len(st.session_state.history)}",
+                        use_container_width=True
                     ):
                         with st.spinner("Continuing story..."):
                             full_response = st.write_stream(
@@ -109,6 +195,6 @@ if st.session_state.history:
                         st.session_state.history.append(full_response)
                         st.rerun()
         else:
-            st.info("No options found in the latest response.")
+            st.warning("Options were not found in the latest response.")
             with st.expander("Debug latest response"):
                 st.code(latest)
