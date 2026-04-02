@@ -66,7 +66,7 @@ st.markdown("""
     background: rgba(80,200,120,0.06);
     margin-top: 16px;
 }
-.round-badge {
+.scene-badge {
     display: inline-block;
     padding: 6px 12px;
     border-radius: 999px;
@@ -111,7 +111,7 @@ st.markdown("""
     border-radius: 16px;
     padding: 16px;
     background: rgba(255,255,255,0.03);
-    min-height: 180px;
+    min-height: 190px;
     margin-bottom: 10px;
 }
 </style>
@@ -140,28 +140,30 @@ def extract_options(text: str):
 
     choice_part = text[idx + len(marker):].strip()
 
-    block_match = re.search(
+    match = re.search(
         r"A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*)",
         choice_part,
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    if block_match:
-        a_text = " ".join(block_match.group(1).split())
-        b_text = " ".join(block_match.group(2).split())
-        c_text = " ".join(block_match.group(3).split())
+    if not match:
+        return []
 
-        c_text = re.split(
-            r"FINAL RESULT|SCENE\s+\d+|Reflection Insight",
-            c_text,
-            maxsplit=1,
-            flags=re.IGNORECASE
-        )[0].strip()
+    a_text = " ".join(match.group(1).split())
+    b_text = " ".join(match.group(2).split())
+    c_text = " ".join(match.group(3).split())
 
-        c_text = " ".join(c_text.split())
+    c_text = re.split(
+        r"Reflection Insight|FINAL RESULT|SCENE\s+\d+",
+        c_text,
+        maxsplit=1,
+        flags=re.IGNORECASE
+    )[0].strip()
 
-        if a_text and b_text and c_text:
-            return [("A", a_text), ("B", b_text), ("C", c_text)]
+    c_text = " ".join(c_text.split())
+
+    if a_text and b_text and c_text:
+        return [("A", a_text), ("B", b_text), ("C", c_text)]
 
     return []
 
@@ -193,32 +195,19 @@ def render_story_block(text: str):
     scene_match = re.search(r"SCENE\s+(\d+)", text, flags=re.IGNORECASE)
     if scene_match:
         scene_num = int(scene_match.group(1))
-        st.markdown(
-            f'<div class="round-badge">🎬 Scene {scene_num}</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown(f'<div class="scene-badge">🎬 Scene {scene_num}</div>', unsafe_allow_html=True)
         st.progress(scene_num / 5)
 
     final = is_final_result(text)
 
-    lines = text.splitlines()
-    scene_lines = []
-
-    # Only keep scene/final content, hide raw written choices entirely
-    for line in lines:
-        clean = line.strip()
-        if not clean:
-            continue
-
-        if clean.lower().startswith("choose what happens next"):
-            break
-
-        scene_lines.append(clean)
+    # Remove all option text from story display
+    story_only = re.split(r"Choose what happens next:", text, maxsplit=1, flags=re.IGNORECASE)[0]
+    lines = [line.strip() for line in story_only.splitlines() if line.strip()]
 
     box_class = "final-box" if final else "scene-box"
     st.markdown(f'<div class="{box_class}">', unsafe_allow_html=True)
 
-    for line in scene_lines:
+    for line in lines:
         if line.lower().startswith("reflection insight"):
             insight = line.split(":", 1)[1].strip() if ":" in line else line
             st.markdown(
@@ -346,6 +335,3 @@ if st.session_state.history:
                             )
                         st.session_state.history.append(full_response)
                         st.rerun()
-        else:
-            with st.expander("Debug latest response"):
-                st.code(latest)
