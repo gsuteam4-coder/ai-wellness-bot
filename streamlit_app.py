@@ -16,19 +16,16 @@ PERSONAS = {
         "title": "Malik — Social Anxiety",
         "summary": "Malik struggles with group events, overthinking, and fear of judgment.",
         "emoji": "🧑🏽",
-        "color": "#1f6f8b"
     },
     "Rina": {
         "title": "Rina — Caregiver Burnout",
         "summary": "Rina is emotionally drained from always caring for others and neglecting herself.",
         "emoji": "👩🏽",
-        "color": "#7b4f9c"
     },
     "Ava": {
         "title": "Ava — Chronic Pain",
         "summary": "Ava lives with ongoing pain, low energy, and frustration from not feeling understood.",
         "emoji": "👩🏼",
-        "color": "#9c6b30"
     }
 }
 
@@ -109,11 +106,21 @@ st.markdown("""
     color: #aeb7c7;
     font-size: 0.95rem;
 }
+.insight-box {
+    border-left: 4px solid #facc15;
+    padding: 12px;
+    margin: 14px 0;
+    background: rgba(250,204,21,0.08);
+    border-radius: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">💚 Aanya Wellness Simulation</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Choose a persona and explore their emotional journey through guided decisions.</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="sub-title">Choose a persona and explore their emotional journey through guided decisions.</div>',
+    unsafe_allow_html=True
+)
 
 
 def normalize_text(text: str) -> str:
@@ -143,7 +150,7 @@ def extract_options(text: str):
         c_text = " ".join(block_match.group(3).split())
 
         c_text = re.split(
-            r"FINAL RESULT|ROUND\s+\d+",
+            r"FINAL RESULT|SCENE\s+\d+",
             c_text,
             maxsplit=1,
             flags=re.IGNORECASE
@@ -184,11 +191,14 @@ def stream_flowise(user_message: str, session_id: str):
 def render_story_block(text: str):
     text = normalize_text(text)
 
-    round_match = re.search(r"ROUND\s+(\d+)", text, flags=re.IGNORECASE)
-    if round_match:
-        round_num = int(round_match.group(1))
-        st.markdown(f'<div class="round-badge">Round {round_num}</div>', unsafe_allow_html=True)
-        st.progress(round_num / 4)
+    scene_match = re.search(r"SCENE\s+(\d+)", text, flags=re.IGNORECASE)
+    if scene_match:
+        scene_num = int(scene_match.group(1))
+        st.markdown(
+            f'<div class="round-badge">🎬 Scene {scene_num}</div>',
+            unsafe_allow_html=True
+        )
+        st.progress(scene_num / 5)
 
     final = is_final_result(text)
 
@@ -216,20 +226,35 @@ def render_story_block(text: str):
     st.markdown(f'<div class="{box_class}">', unsafe_allow_html=True)
 
     for line in scene_lines:
-        if line.startswith("Aanya:"):
+        if line.lower().startswith("reflection insight"):
+            insight = line.split(":", 1)[1].strip() if ":" in line else line
+            st.markdown(
+                f'<div class="insight-box">💡 <b>Reflection Insight</b><br>{insight}</div>',
+                unsafe_allow_html=True
+            )
+        elif line.startswith("Aanya:"):
             content = line.replace("Aanya:", "", 1).strip()
-            st.markdown(f'<div class="aanya"><b>Aanya 💚</b><br>{content}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="aanya"><b>Aanya 💚</b><br>{content}</div>',
+                unsafe_allow_html=True
+            )
         elif ":" in line and not line.upper().startswith("FINAL RESULT"):
             speaker, content = line.split(":", 1)
             speaker = speaker.strip()
             content = content.strip()
-            st.markdown(f'<div class="persona"><b>{speaker}</b><br>{content}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="persona"><b>{speaker}</b><br>{content}</div>',
+                unsafe_allow_html=True
+            )
         else:
             st.markdown(f"<p>{line}</p>", unsafe_allow_html=True)
 
     if choice_lines and not final:
         st.markdown('<div class="choice-box">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">✨ What would you do in this moment?</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title">✨ What would you do in this moment?</div>',
+            unsafe_allow_html=True
+        )
         for line in choice_lines:
             st.markdown(f"<p>{line}</p>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -245,7 +270,6 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "selected_persona" not in st.session_state:
     st.session_state.selected_persona = None
-
 
 top_col1, top_col2 = st.columns([1, 5])
 with top_col1:
@@ -322,7 +346,7 @@ if st.session_state.history:
                 with cols[idx]:
                     st.markdown(
                         f"""
-                        <div class="persona-card" style="min-height:180px;">
+                        <div class="persona-card" style="min-height:200px;">
                             <div style="font-weight:700; margin-bottom:8px;">Option {letter}</div>
                             <div class="small-muted">{option_text}</div>
                         </div>
