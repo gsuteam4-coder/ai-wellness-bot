@@ -59,13 +59,6 @@ st.markdown("""
     background: rgba(255,255,255,0.02);
     margin-bottom: 18px;
 }
-.choice-box {
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 18px;
-    padding: 18px;
-    background: rgba(255,255,255,0.02);
-    margin-top: 12px;
-}
 .final-box {
     border: 1px solid rgba(80,200,120,0.25);
     border-radius: 18px;
@@ -113,6 +106,14 @@ st.markdown("""
     background: rgba(250,204,21,0.08);
     border-radius: 10px;
 }
+.option-card {
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 16px;
+    padding: 16px;
+    background: rgba(255,255,255,0.03);
+    min-height: 180px;
+    margin-bottom: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,15 +123,16 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-def normalize_text(text: str) -> str:
+def clean_text(text: str) -> str:
     if not text:
         return ""
-    return text.replace("\r\n", "\n").replace("\r", "\n")
-
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("**", "")
+    text = text.replace("---", "")
+    return text.strip()
 
 def extract_options(text: str):
-    text = normalize_text(text)
+    text = clean_text(text)
     marker = "Choose what happens next:"
     idx = text.lower().find(marker.lower())
     if idx == -1:
@@ -150,7 +152,7 @@ def extract_options(text: str):
         c_text = " ".join(block_match.group(3).split())
 
         c_text = re.split(
-            r"FINAL RESULT|SCENE\s+\d+",
+            r"FINAL RESULT|SCENE\s+\d+|Reflection Insight",
             c_text,
             maxsplit=1,
             flags=re.IGNORECASE
@@ -163,11 +165,9 @@ def extract_options(text: str):
 
     return []
 
-
 def is_final_result(text: str) -> bool:
     upper = text.upper()
     return "FINAL RESULT" in upper or "WELLNESS LEVEL" in upper
-
 
 def stream_flowise(user_message: str, session_id: str):
     completion = client.create_prediction(
@@ -187,9 +187,8 @@ def stream_flowise(user_message: str, session_id: str):
         except Exception:
             continue
 
-
 def render_story_block(text: str):
-    text = normalize_text(text)
+    text = clean_text(text)
 
     scene_match = re.search(r"SCENE\s+(\d+)", text, flags=re.IGNORECASE)
     if scene_match:
@@ -203,24 +202,18 @@ def render_story_block(text: str):
     final = is_final_result(text)
 
     lines = text.splitlines()
-    choices_started = False
-
     scene_lines = []
-    choice_lines = []
 
+    # Only keep scene/final content, hide raw written choices entirely
     for line in lines:
         clean = line.strip()
         if not clean:
             continue
 
         if clean.lower().startswith("choose what happens next"):
-            choices_started = True
-            continue
+            break
 
-        if choices_started:
-            choice_lines.append(clean)
-        else:
-            scene_lines.append(clean)
+        scene_lines.append(clean)
 
     box_class = "final-box" if final else "scene-box"
     st.markdown(f'<div class="{box_class}">', unsafe_allow_html=True)
@@ -249,18 +242,7 @@ def render_story_block(text: str):
         else:
             st.markdown(f"<p>{line}</p>", unsafe_allow_html=True)
 
-    if choice_lines and not final:
-        st.markdown('<div class="choice-box">', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="section-title">✨ What would you do in this moment?</div>',
-            unsafe_allow_html=True
-        )
-        for line in choice_lines:
-            st.markdown(f"<p>{line}</p>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
@@ -333,7 +315,7 @@ for item in st.session_state.history:
     st.markdown("<br>", unsafe_allow_html=True)
 
 if st.session_state.history:
-    latest = st.session_state.history[-1]
+    latest = clean_text(st.session_state.history[-1])
 
     if not is_final_result(latest):
         options = extract_options(latest)
@@ -346,7 +328,7 @@ if st.session_state.history:
                 with cols[idx]:
                     st.markdown(
                         f"""
-                        <div class="persona-card" style="min-height:200px;">
+                        <div class="option-card">
                             <div style="font-weight:700; margin-bottom:8px;">Option {letter}</div>
                             <div class="small-muted">{option_text}</div>
                         </div>
