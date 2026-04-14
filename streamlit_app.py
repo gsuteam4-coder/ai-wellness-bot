@@ -4,7 +4,7 @@ import uuid
 import streamlit as st
 from flowise import Flowise, PredictionData
 
-st.set_page_config(page_title="Aanya Wellness Simulation", layout="wide")
+st.set_page_config(page_title="The Resilience Game", layout="wide")
 
 BASE_URL = "https://cloud.flowiseai.com"
 FLOW_ID = "fd821f6f-939f-4b5c-89b4-910760fcb0f8"
