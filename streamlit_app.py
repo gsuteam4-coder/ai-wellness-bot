@@ -117,9 +117,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">💚 Aanya Wellness Simulation</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🌿 The Resilience Game</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="sub-title">Choose a persona and explore their emotional journey through guided decisions.</div>',
+    '<div class="sub-title">Choose a persona and Guide through real-life emotional situations and explore different paths of resilience.</div>',
     unsafe_allow_html=True
 )
 
