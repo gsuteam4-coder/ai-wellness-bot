@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import re
+import json
 
 st.set_page_config(
     page_title="The Resilience Game",
@@ -44,9 +45,6 @@ if "selected_persona" not in st.session_state:
 if "story_started" not in st.session_state:
     st.session_state.story_started = False
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 if "current_scene" not in st.session_state:
     st.session_state.current_scene = 0
 
@@ -55,6 +53,9 @@ if "last_response" not in st.session_state:
 
 if "final_result" not in st.session_state:
     st.session_state.final_result = False
+
+if "raw_response" not in st.session_state:
+    st.session_state.raw_response = ""
 
 # -----------------------------
 # STYLING
@@ -143,7 +144,7 @@ st.markdown("""
         background: linear-gradient(180deg, #1f2937, #111827);
         border-radius: 22px;
         padding: 1.2rem;
-        min-height: 480px;
+        min-height: 420px;
         border: 1px solid rgba(255,255,255,0.10);
         box-shadow: 0 8px 24px rgba(0,0,0,0.20);
     }
@@ -166,7 +167,7 @@ st.markdown("""
         color: #f3f4f6;
         line-height: 1.75;
         white-space: pre-wrap;
-        min-height: 260px;
+        min-height: 240px;
         font-size: 1rem;
     }
 
@@ -187,10 +188,6 @@ st.markdown("""
         color: #e5e7eb;
     }
 
-    .progress-wrap {
-        margin: 0.4rem 0 1rem 0;
-    }
-
     .footer-note {
         text-align: center;
         color: #9ca3af;
@@ -209,29 +206,69 @@ st.markdown("""
 # -----------------------------
 # HELPERS
 # -----------------------------
+def extract_text_from_response(data):
+    if isinstance(data, str):
+        return data.strip()
+
+    if isinstance(data, dict):
+        possible_keys = [
+            "text", "response", "message", "answer", "output",
+            "result", "content"
+        ]
+        for key in possible_keys:
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        # nested structures
+        for value in data.values():
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, dict):
+                nested = extract_text_from_response(value)
+                if nested:
+                    return nested
+            if isinstance(value, list) and value:
+                for item in value:
+                    nested = extract_text_from_response(item)
+                    if nested:
+                        return nested
+
+    if isinstance(data, list):
+        for item in data:
+            nested = extract_text_from_response(item)
+            if nested:
+                return nested
+
+    return ""
+
 def call_flowise(user_message: str) -> str:
     try:
+        payload = {"question": user_message}
+
         response = requests.post(
             FLOWISE_API_URL,
-            json={"question": user_message},
+            json=payload,
             timeout=60
         )
         response.raise_for_status()
-        data = response.json()
 
-        if isinstance(data, dict):
-            if "text" in data:
-                return data["text"]
-            if "response" in data:
-                return data["response"]
-            if "message" in data:
-                return data["message"]
-            if "answer" in data:
-                return data["answer"]
+        try:
+            data = response.json()
+            st.session_state.raw_response = json.dumps(data, indent=2)
+        except Exception:
+            data = response.text
+            st.session_state.raw_response = str(data)
 
-        return str(data)
+        text = extract_text_from_response(data)
+
+        if not text:
+            return "No story text was returned from Flowise. Check the raw response below."
+
+        return text
 
     except Exception as e:
+        st.session_state.raw_response = f"Request failed: {e}"
         return f"Error connecting to Flowise: {e}"
 
 def extract_scene_number(text: str) -> int:
@@ -240,7 +277,7 @@ def extract_scene_number(text: str) -> int:
         return int(match.group(1))
     if "FINAL RESULT" in text.upper():
         return 5
-    return st.session_state.current_scene
+    return st.session_state.current_scene or 1
 
 def extract_reflection(text: str) -> str:
     match = re.search(r"Reflection Insight:\s*(.*)", text, re.IGNORECASE)
@@ -248,40 +285,8 @@ def extract_reflection(text: str) -> str:
         return match.group(1).strip()
     return ""
 
-def clean_story_text(text: str) -> str:
-    return text.strip()
-
-def start_game(persona_name: str):
-    st.session_state.selected_persona = persona_name
-    st.session_state.story_started = True
-    st.session_state.messages = []
-    st.session_state.current_scene = 1
-    st.session_state.final_result = False
-
-    opening_prompt = f"Start with {persona_name}"
-    response = call_flowise(opening_prompt)
-    st.session_state.last_response = response
-    st.session_state.messages.append({"role": "assistant", "content": response})
-
-    if "FINAL RESULT" in response.upper():
-        st.session_state.final_result = True
-    else:
-        st.session_state.current_scene = extract_scene_number(response)
-
-def send_choice(choice_text: str):
-    response = call_flowise(choice_text)
-    st.session_state.messages.append({"role": "user", "content": choice_text})
-    st.session_state.messages.append({"role": "assistant", "content": response})
-    st.session_state.last_response = response
-
-    if "FINAL RESULT" in response.upper():
-        st.session_state.final_result = True
-        st.session_state.current_scene = 5
-    else:
-        st.session_state.current_scene = extract_scene_number(response)
-
 def parse_choices(text: str):
-    pattern = r"A\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*)"
+    pattern = r"A\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)(?:\nReflection Insight:|$)"
     match = re.search(pattern, text, re.DOTALL)
     if match:
         return [
@@ -291,13 +296,39 @@ def parse_choices(text: str):
         ]
     return []
 
+def start_game(persona_name: str):
+    st.session_state.selected_persona = persona_name
+    st.session_state.story_started = True
+    st.session_state.current_scene = 1
+    st.session_state.final_result = False
+
+    opening_prompt = f"Start with {persona_name}"
+    response = call_flowise(opening_prompt)
+    st.session_state.last_response = response
+
+    if "FINAL RESULT" in response.upper():
+        st.session_state.final_result = True
+        st.session_state.current_scene = 5
+    else:
+        st.session_state.current_scene = extract_scene_number(response)
+
+def send_choice(choice_text: str):
+    response = call_flowise(choice_text)
+    st.session_state.last_response = response
+
+    if "FINAL RESULT" in response.upper():
+        st.session_state.final_result = True
+        st.session_state.current_scene = 5
+    else:
+        st.session_state.current_scene = extract_scene_number(response)
+
 def restart_game():
     st.session_state.selected_persona = None
     st.session_state.story_started = False
-    st.session_state.messages = []
     st.session_state.current_scene = 0
     st.session_state.last_response = ""
     st.session_state.final_result = False
+    st.session_state.raw_response = ""
 
 # -----------------------------
 # HEADER
@@ -373,7 +404,7 @@ else:
     with left:
         st.markdown('<div class="story-panel">', unsafe_allow_html=True)
 
-        scene_text = clean_story_text(st.session_state.last_response)
+        scene_text = st.session_state.last_response.strip()
         reflection_text = extract_reflection(scene_text)
 
         if st.session_state.final_result:
@@ -384,8 +415,10 @@ else:
                 unsafe_allow_html=True
             )
 
+        safe_story = scene_text if scene_text else "Story response is empty."
+
         st.markdown(f"""
-        <div class="story-text">{scene_text}</div>
+        <div class="story-text">{safe_story}</div>
         """, unsafe_allow_html=True)
 
         if reflection_text and not st.session_state.final_result:
@@ -397,16 +430,13 @@ else:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="progress-wrap">', unsafe_allow_html=True)
         st.progress(min(st.session_state.current_scene, 5) / 5)
-        st.markdown('</div>', unsafe_allow_html=True)
 
         if not st.session_state.final_result:
-            choices = parse_choices(st.session_state.last_response)
+            choices = parse_choices(scene_text)
 
             if len(choices) == 3:
                 st.markdown("### Choose what happens next:")
-
                 c1, c2, c3 = st.columns(3)
 
                 with c1:
@@ -424,7 +454,10 @@ else:
                         send_choice(f"C) {choices[2]}")
                         st.rerun()
             else:
-                st.info("Choices could not be parsed from the response. Check the Flowise output format.")
+                st.warning("Choices could not be parsed from the response.")
+
+        with st.expander("Show Raw Flowise Response"):
+            st.code(st.session_state.raw_response or "No raw response yet.", language="json")
 
     with right:
         p = PERSONAS[st.session_state.selected_persona]
