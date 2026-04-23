@@ -1,91 +1,45 @@
+import os
 import streamlit as st
-import requests
-import re
-import json
+from datetime import datetime
 
+# -----------------------------
+# Page config
+# -----------------------------
 st.set_page_config(
     page_title="The Resilience Game",
-    page_icon="💚",
+    page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # -----------------------------
-# FLOWISE CONFIG
-# -----------------------------
-FLOWISE_API_URL = "https://cloud.flowiseai.com/api/v1/prediction/fd821f6f-939f-4b5c-89b4-910760fcb0f8"
-
-PERSONAS = {
-    "Malik": {
-        "subtitle": "Social Anxiety",
-        "emoji": "😟",
-        "color": "linear-gradient(135deg, #60a5fa, #2563eb)",
-        "description": "Malik often feels overwhelmed in social situations and struggles with fear of judgment."
-    },
-    "Rina": {
-        "subtitle": "Caregiver Burnout",
-        "emoji": "😔",
-        "color": "linear-gradient(135deg, #f59e0b, #ea580c)",
-        "description": "Rina is exhausted from caring for others and rarely gives herself time to rest."
-    },
-    "Ava": {
-        "subtitle": "Chronic Pain",
-        "emoji": "🌧️",
-        "color": "linear-gradient(135deg, #a78bfa, #7c3aed)",
-        "description": "Ava is managing daily pain while trying to hold on to routines, hope, and self-worth."
-    }
-}
-
-# -----------------------------
-# SESSION STATE
-# -----------------------------
-if "selected_persona" not in st.session_state:
-    st.session_state.selected_persona = None
-
-if "story_started" not in st.session_state:
-    st.session_state.story_started = False
-
-if "current_scene" not in st.session_state:
-    st.session_state.current_scene = 0
-
-if "last_response" not in st.session_state:
-    st.session_state.last_response = ""
-
-if "final_result" not in st.session_state:
-    st.session_state.final_result = False
-
-if "raw_response" not in st.session_state:
-    st.session_state.raw_response = ""
-
-# -----------------------------
-# STYLING
+# Custom CSS
 # -----------------------------
 st.markdown("""
 <style>
     .stApp {
         background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-        color: white;
     }
 
     .block-container {
-        max-width: 1250px;
-        padding-top: 1rem;
-        padding-bottom: 2rem;
+        padding-top: 1.2rem;
+        padding-bottom: 1rem;
+        max-width: 1300px;
     }
 
     .hero-box {
-        background: linear-gradient(135deg, #10b981, #2563eb);
-        padding: 1.4rem 1.6rem;
-        border-radius: 24px;
-        margin-bottom: 1.2rem;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        background: linear-gradient(135deg, #14b8a6, #2563eb);
+        padding: 1.5rem 1.7rem;
+        border-radius: 22px;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.22);
     }
 
     .hero-title {
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 800;
         color: white;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.25rem;
     }
 
     .hero-subtitle {
@@ -93,407 +47,380 @@ st.markdown("""
         color: #ecfeff;
     }
 
-    .game-box {
-        background: rgba(255,255,255,0.06);
+    .metric-card {
+        background: rgba(255,255,255,0.08);
+        padding: 1rem;
+        border-radius: 18px;
         border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 22px;
-        padding: 1.2rem;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.20);
+        box-shadow: 0 1px 10px rgba(0,0,0,0.10);
+        text-align: center;
+        color: white;
+        min-height: 95px;
     }
 
     .section-title {
-        font-size: 1.2rem;
+        font-size: 1.05rem;
         font-weight: 700;
         color: white;
-        margin-bottom: 0.8rem;
+        margin-top: 0.2rem;
+        margin-bottom: 0.6rem;
     }
 
-    .persona-card {
+    .panel-box {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.10);
         border-radius: 20px;
         padding: 1rem;
-        min-height: 220px;
-        color: white;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.20);
-        border: 1px solid rgba(255,255,255,0.15);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
     }
 
-    .persona-emoji {
-        font-size: 2.8rem;
-        margin-bottom: 0.4rem;
-    }
-
-    .persona-name {
-        font-size: 1.3rem;
-        font-weight: 800;
-        margin-bottom: 0.15rem;
-    }
-
-    .persona-subtitle {
-        font-size: 0.95rem;
-        color: #f3f4f6;
-        margin-bottom: 0.8rem;
-    }
-
-    .persona-desc {
-        font-size: 0.92rem;
-        line-height: 1.5;
-        color: #f9fafb;
-    }
-
-    .story-panel {
-        background: linear-gradient(180deg, #1f2937, #111827);
-        border-radius: 22px;
-        padding: 1.2rem;
-        min-height: 420px;
-        border: 1px solid rgba(255,255,255,0.10);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.20);
-    }
-
-    .scene-badge {
-        display: inline-block;
-        background: #10b981;
-        color: white;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.86rem;
-        font-weight: 700;
-        margin-bottom: 0.8rem;
-    }
-
-    .story-text {
-        background: rgba(255,255,255,0.05);
-        padding: 1rem;
-        border-radius: 16px;
-        color: #f3f4f6;
-        line-height: 1.75;
-        white-space: pre-wrap;
-        min-height: 240px;
-        font-size: 1rem;
-    }
-
-    .reflection-box {
-        margin-top: 1rem;
-        background: rgba(16,185,129,0.10);
-        border: 1px solid rgba(16,185,129,0.30);
-        border-radius: 16px;
-        padding: 0.9rem 1rem;
-        color: #d1fae5;
-    }
-
-    .tip-box {
-        margin-top: 1rem;
-        background: rgba(255,255,255,0.05);
+    .scene-info-box {
+        background: rgba(255,255,255,0.07);
         border-radius: 16px;
         padding: 1rem;
         color: #e5e7eb;
+        margin-top: 0.8rem;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .scene-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: white;
+        margin-bottom: 0.3rem;
+    }
+
+    .scene-desc {
+        font-size: 0.96rem;
+        line-height: 1.6;
+        color: #dbeafe;
+    }
+
+    .fallback-scene {
+        min-height: 320px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+        padding: 2rem;
+        color: white;
+        background: linear-gradient(135deg, #1e3a8a, #0f766e, #7c3aed);
+        border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .fallback-emoji {
+        font-size: 4rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .fallback-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        margin-bottom: 0.4rem;
+    }
+
+    .fallback-text {
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: #e0f2fe;
+        max-width: 90%;
+    }
+
+    .stChatMessage {
+        border-radius: 16px;
+        padding: 0.25rem;
+    }
+
+    .stChatMessage [data-testid="stMarkdownContainer"] p {
+        font-size: 1rem;
+        line-height: 1.6;
     }
 
     .footer-note {
         text-align: center;
-        color: #9ca3af;
-        font-size: 0.9rem;
-        margin-top: 1rem;
+        color: #cbd5e1;
+        font-size: 0.88rem;
+        margin-top: 1.2rem;
     }
 
     div[data-testid="stButton"] > button {
         border-radius: 14px !important;
-        min-height: 52px;
+        min-height: 48px;
         font-weight: 700;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# HELPERS
+# Session state
 # -----------------------------
-def extract_text_from_response(data):
-    if isinstance(data, str):
-        return data.strip()
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "content": "Hi, I’m your support persona. I’m here to guide you gently through this wellness experience. How are you feeling today?"
+        }
+    ]
 
-    if isinstance(data, dict):
-        possible_keys = [
-            "text", "response", "message", "answer", "output",
-            "result", "content"
-        ]
-        for key in possible_keys:
-            value = data.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
+if "selected_persona" not in st.session_state:
+    st.session_state.selected_persona = "Anxiety Support"
 
-        # nested structures
-        for value in data.values():
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-            if isinstance(value, dict):
-                nested = extract_text_from_response(value)
-                if nested:
-                    return nested
-            if isinstance(value, list) and value:
-                for item in value:
-                    nested = extract_text_from_response(item)
-                    if nested:
-                        return nested
-
-    if isinstance(data, list):
-        for item in data:
-            nested = extract_text_from_response(item)
-            if nested:
-                return nested
-
-    return ""
-
-def call_flowise(user_message: str) -> str:
-    try:
-        payload = {"question": user_message}
-
-        response = requests.post(
-            FLOWISE_API_URL,
-            json=payload,
-            timeout=60
-        )
-        response.raise_for_status()
-
-        try:
-            data = response.json()
-            st.session_state.raw_response = json.dumps(data, indent=2)
-        except Exception:
-            data = response.text
-            st.session_state.raw_response = str(data)
-
-        text = extract_text_from_response(data)
-
-        if not text:
-            return "No story text was returned from Flowise. Check the raw response below."
-
-        return text
-
-    except Exception as e:
-        st.session_state.raw_response = f"Request failed: {e}"
-        return f"Error connecting to Flowise: {e}"
-
-def extract_scene_number(text: str) -> int:
-    match = re.search(r"SCENE\s+(\d+)", text, re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-    if "FINAL RESULT" in text.upper():
-        return 5
-    return st.session_state.current_scene or 1
-
-def extract_reflection(text: str) -> str:
-    match = re.search(r"Reflection Insight:\s*(.*)", text, re.IGNORECASE)
-    if match:
-        return match.group(1).strip()
-    return ""
-
-def parse_choices(text: str):
-    pattern = r"A\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)(?:\nReflection Insight:|$)"
-    match = re.search(pattern, text, re.DOTALL)
-    if match:
-        return [
-            match.group(1).strip(),
-            match.group(2).strip(),
-            match.group(3).strip()
-        ]
-    return []
-
-def start_game(persona_name: str):
-    st.session_state.selected_persona = persona_name
-    st.session_state.story_started = True
-    st.session_state.current_scene = 1
-    st.session_state.final_result = False
-
-    opening_prompt = f"Start with {persona_name}"
-    response = call_flowise(opening_prompt)
-    st.session_state.last_response = response
-
-    if "FINAL RESULT" in response.upper():
-        st.session_state.final_result = True
-        st.session_state.current_scene = 5
-    else:
-        st.session_state.current_scene = extract_scene_number(response)
-
-def send_choice(choice_text: str):
-    response = call_flowise(choice_text)
-    st.session_state.last_response = response
-
-    if "FINAL RESULT" in response.upper():
-        st.session_state.final_result = True
-        st.session_state.current_scene = 5
-    else:
-        st.session_state.current_scene = extract_scene_number(response)
-
-def restart_game():
-    st.session_state.selected_persona = None
-    st.session_state.story_started = False
-    st.session_state.current_scene = 0
-    st.session_state.last_response = ""
-    st.session_state.final_result = False
-    st.session_state.raw_response = ""
+if "mood" not in st.session_state:
+    st.session_state.mood = "Stressed"
 
 # -----------------------------
-# HEADER
+# Image mappings
+# -----------------------------
+persona_images = {
+    "Anxiety Support": "images/anxiety_support.jpg",
+    "Burnout Support": "images/burnout_support.jpg",
+    "Stress Reflection": "images/stress_reflection.jpg"
+}
+
+mood_images = {
+    "Calm": "images/calm.jpg",
+    "Okay": "images/okay.jpg",
+    "Stressed": "images/stressed.jpg",
+    "Anxious": "images/anxious.jpg",
+    "Overwhelmed": "images/overwhelmed.jpg"
+}
+
+scene_descriptions = {
+    "Calm": {
+        "emoji": "🌅",
+        "title": "Calm Reflection Scene",
+        "desc": "A quiet and peaceful setting that supports self-awareness, grounding, and emotional balance."
+    },
+    "Okay": {
+        "emoji": "🌿",
+        "title": "Steady Wellness Scene",
+        "desc": "A balanced space showing emotional stability, light energy, and room for gentle reflection."
+    },
+    "Stressed": {
+        "emoji": "☁️",
+        "title": "Pressure and Deadlines Scene",
+        "desc": "A tense environment reflecting workload, mental clutter, and the need to pause before overwhelm builds further."
+    },
+    "Anxious": {
+        "emoji": "🌧️",
+        "title": "Anxiety Support Scene",
+        "desc": "A heavier emotional space reflecting overthinking, social tension, worry, and the need for support."
+    },
+    "Overwhelmed": {
+        "emoji": "🌊",
+        "title": "Overwhelm Recovery Scene",
+        "desc": "A mentally overloaded scene where rest, clarity, and emotional regulation become most important."
+    }
+}
+
+# -----------------------------
+# Helpers
+# -----------------------------
+def get_scene_image():
+    persona_img = persona_images.get(st.session_state.selected_persona)
+    mood_img = mood_images.get(st.session_state.mood)
+
+    if mood_img and os.path.exists(mood_img):
+        return mood_img
+    if persona_img and os.path.exists(persona_img):
+        return persona_img
+    return None
+
+def render_fallback_scene():
+    scene = scene_descriptions.get(st.session_state.mood, scene_descriptions["Stressed"])
+    st.markdown(f"""
+    <div class="fallback-scene">
+        <div class="fallback-emoji">{scene['emoji']}</div>
+        <div class="fallback-title">{scene['title']}</div>
+        <div class="fallback-text">{scene['desc']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# -----------------------------
+# Sidebar
+# -----------------------------
+with st.sidebar:
+    st.title("🌿 Resilience Game")
+    st.caption("Human-Centered AI for Wellness")
+
+    st.markdown("### Persona")
+    st.session_state.selected_persona = st.selectbox(
+        "Choose persona",
+        ["Anxiety Support", "Burnout Support", "Stress Reflection"],
+        index=["Anxiety Support", "Burnout Support", "Stress Reflection"].index(st.session_state.selected_persona)
+    )
+
+    st.markdown("### Check-in")
+    st.session_state.mood = st.radio(
+        "How are you feeling today?",
+        ["Calm", "Okay", "Stressed", "Anxious", "Overwhelmed"],
+        index=["Calm", "Okay", "Stressed", "Anxious", "Overwhelmed"].index(st.session_state.mood)
+    )
+
+    st.markdown("### Session Tools")
+    if st.button("🧹 Clear Chat", use_container_width=True):
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content": "Chat cleared. I’m here with you. What would you like to talk about now?"
+            }
+        ]
+        st.rerun()
+
+    if st.button("📝 Reflection Prompt", use_container_width=True):
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "Take a moment to reflect: What has been the heaviest thing on your mind this week?"
+        })
+        st.rerun()
+
+    if st.button("💙 Breathing Exercise", use_container_width=True):
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "Let’s pause for a short breathing exercise. Inhale for 4... hold for 4... exhale for 6. Repeat three times."
+        })
+        st.rerun()
+
+# -----------------------------
+# Header
 # -----------------------------
 st.markdown("""
 <div class="hero-box">
     <div class="hero-title">💚 The Resilience Game</div>
     <div class="hero-subtitle">
-        Guide a wellness story. Support one persona through 5 scenes of emotional decisions, reflection, and growth.
+        An interactive wellness experience using AI personas, scene visuals, reflection, and emotional support.
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# START SCREEN
+# Top metrics
 # -----------------------------
-if not st.session_state.story_started:
-    st.markdown('<div class="game-box">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Choose a Persona to Begin</div>', unsafe_allow_html=True)
+col1, col2, col3 = st.columns(3)
 
-    col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="section-title">Active Persona</div>
+        <div>{st.session_state.selected_persona}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col1:
-        p = PERSONAS["Malik"]
-        st.markdown(f"""
-        <div class="persona-card" style="background:{p['color']};">
-            <div class="persona-emoji">{p['emoji']}</div>
-            <div class="persona-name">Malik</div>
-            <div class="persona-subtitle">{p['subtitle']}</div>
-            <div class="persona-desc">{p['description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Start Malik's Story", use_container_width=True):
-            start_game("Malik")
-            st.rerun()
+with col2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="section-title">Current Mood</div>
+        <div>{st.session_state.mood}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col2:
-        p = PERSONAS["Rina"]
-        st.markdown(f"""
-        <div class="persona-card" style="background:{p['color']};">
-            <div class="persona-emoji">{p['emoji']}</div>
-            <div class="persona-name">Rina</div>
-            <div class="persona-subtitle">{p['subtitle']}</div>
-            <div class="persona-desc">{p['description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Start Rina's Story", use_container_width=True):
-            start_game("Rina")
-            st.rerun()
+with col3:
+    current_time = datetime.now().strftime("%I:%M %p")
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="section-title">Session Time</div>
+        <div>{current_time}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col3:
-        p = PERSONAS["Ava"]
-        st.markdown(f"""
-        <div class="persona-card" style="background:{p['color']};">
-            <div class="persona-emoji">{p['emoji']}</div>
-            <div class="persona-name">Ava</div>
-            <div class="persona-subtitle">{p['subtitle']}</div>
-            <div class="persona-desc">{p['description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Start Ava's Story", use_container_width=True):
-            start_game("Ava")
-            st.rerun()
+# -----------------------------
+# Quick start buttons
+# -----------------------------
+st.markdown("### Quick Start")
+
+q1, q2, q3, q4 = st.columns(4)
+with q1:
+    if st.button("I feel anxious", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "I feel anxious today."})
+        st.rerun()
+
+with q2:
+    if st.button("I’m overthinking", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "I’m overthinking everything."})
+        st.rerun()
+
+with q3:
+    if st.button("I need motivation", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "I need motivation and emotional support."})
+        st.rerun()
+
+with q4:
+    if st.button("Help me calm down", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "Can you help me calm down?"})
+        st.rerun()
+
+# -----------------------------
+# Main layout: Scene + Chat
+# -----------------------------
+left_col, right_col = st.columns([1.1, 1.4])
+
+with left_col:
+    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Current Scene</div>', unsafe_allow_html=True)
+
+    scene_image = get_scene_image()
+    if scene_image:
+        st.image(scene_image, use_container_width=True)
+    else:
+        render_fallback_scene()
+
+    current_scene = scene_descriptions.get(st.session_state.mood, scene_descriptions["Stressed"])
+    st.markdown(f"""
+    <div class="scene-info-box">
+        <div class="scene-title">{current_scene['title']}</div>
+        <div class="scene-desc">{current_scene['desc']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with right_col:
+    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
+    st.markdown("### Conversation")
+
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------
-# GAME SCREEN
+# Replace this function with your Flowise/API call
 # -----------------------------
-else:
-    left, right = st.columns([2, 1])
-
-    with left:
-        st.markdown('<div class="story-panel">', unsafe_allow_html=True)
-
-        scene_text = st.session_state.last_response.strip()
-        reflection_text = extract_reflection(scene_text)
-
-        if st.session_state.final_result:
-            st.markdown('<div class="scene-badge">FINAL RESULT</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(
-                f'<div class="scene-badge">Scene {st.session_state.current_scene} of 5</div>',
-                unsafe_allow_html=True
-            )
-
-        safe_story = scene_text if scene_text else "Story response is empty."
-
-        st.markdown(f"""
-        <div class="story-text">{safe_story}</div>
-        """, unsafe_allow_html=True)
-
-        if reflection_text and not st.session_state.final_result:
-            st.markdown(f"""
-            <div class="reflection-box">
-                <b>Reflection Insight:</b> {reflection_text}
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.progress(min(st.session_state.current_scene, 5) / 5)
-
-        if not st.session_state.final_result:
-            choices = parse_choices(scene_text)
-
-            if len(choices) == 3:
-                st.markdown("### Choose what happens next:")
-                c1, c2, c3 = st.columns(3)
-
-                with c1:
-                    if st.button(f"A) {choices[0]}", use_container_width=True):
-                        send_choice(f"A) {choices[0]}")
-                        st.rerun()
-
-                with c2:
-                    if st.button(f"B) {choices[1]}", use_container_width=True):
-                        send_choice(f"B) {choices[1]}")
-                        st.rerun()
-
-                with c3:
-                    if st.button(f"C) {choices[2]}", use_container_width=True):
-                        send_choice(f"C) {choices[2]}")
-                        st.rerun()
-            else:
-                st.warning("Choices could not be parsed from the response.")
-
-        with st.expander("Show Raw Flowise Response"):
-            st.code(st.session_state.raw_response or "No raw response yet.", language="json")
-
-    with right:
-        p = PERSONAS[st.session_state.selected_persona]
-        st.markdown('<div class="game-box">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Current Persona</div>', unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div class="persona-card" style="background:{p['color']}; min-height:180px;">
-            <div class="persona-emoji">{p['emoji']}</div>
-            <div class="persona-name">{st.session_state.selected_persona}</div>
-            <div class="persona-subtitle">{p['subtitle']}</div>
-            <div class="persona-desc">{p['description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown('<div class="tip-box">', unsafe_allow_html=True)
-        st.markdown("**Your Role**")
-        st.write("Guide the persona through each scene by choosing the kind of support you want to give.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="tip-box">', unsafe_allow_html=True)
-        st.markdown("**Story Progress**")
-        if st.session_state.final_result:
-            st.write("The story has reached its ending.")
-        else:
-            st.write(f"You are currently in Scene {st.session_state.current_scene} of 5.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        if st.button("🔄 Restart Game", use_container_width=True):
-            restart_game()
-            st.rerun()
+def get_bot_response(user_text: str) -> str:
+    persona = st.session_state.selected_persona
+    mood = st.session_state.mood
+    return (
+        f"You’re interacting with the {persona} persona. "
+        f"I can sense that the current emotional tone is {mood.lower()}. "
+        f"You said: '{user_text}'. That sounds important. Can you tell me a little more about what triggered this feeling?"
+    )
 
 # -----------------------------
-# FOOTER
+# Chat input
+# -----------------------------
+user_input = st.chat_input("Share what’s on your mind...")
+
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    bot_reply = get_bot_response(user_input)
+    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+    st.rerun()
+
+# -----------------------------
+# Footer
 # -----------------------------
 st.markdown(
-    "<div class='footer-note'>Interactive wellness storytelling powered by Aanya 💚</div>",
+    "<div class='footer-note'>Built with Streamlit for a more visual and reflective wellness experience.</div>",
     unsafe_allow_html=True
 )
