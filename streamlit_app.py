@@ -16,34 +16,43 @@ PERSONAS = {
         "title": "Malik — Social Anxiety",
         "summary": "Malik struggles with group events, overthinking, and fear of judgment.",
         "emoji": "🧑🏽",
+        "scene_emoji": "🌃",
+        "scene_title": "Campus Social Pressure",
+        "scene_desc": "A crowded campus setting, loud conversations, and the pressure of being seen."
     },
     "Rina": {
         "title": "Rina — Caregiver Burnout",
         "summary": "Rina is emotionally drained from always caring for others and neglecting herself.",
         "emoji": "👩🏽",
+        "scene_emoji": "🏠",
+        "scene_title": "Caregiver Exhaustion",
+        "scene_desc": "A home full of responsibilities where everyone needs something from her at once."
     },
     "Ava": {
         "title": "Ava — Chronic Pain",
         "summary": "Ava lives with ongoing pain, low energy, and frustration from not feeling understood.",
         "emoji": "👩🏼",
+        "scene_emoji": "🌧️",
+        "scene_title": "Pain and Fatigue",
+        "scene_desc": "A slow and heavy day where even simple tasks take more energy than usual."
     }
 }
 
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 1.8rem;
+    padding-top: 1.6rem;
     padding-bottom: 2rem;
-    max-width: 1120px;
+    max-width: 1180px;
 }
 
 .stApp {
     background: radial-gradient(circle at top left, #0d1b2a 0%, #07111f 45%, #040913 100%);
 }
 
-/* Header */
+/* Hero */
 .hero-wrap {
-    padding: 1.3rem 1.5rem;
+    padding: 1.4rem 1.6rem;
     border-radius: 24px;
     background: linear-gradient(135deg, rgba(34,197,94,0.18), rgba(59,130,246,0.18));
     border: 1px solid rgba(255,255,255,0.08);
@@ -65,7 +74,40 @@ st.markdown("""
     line-height: 1.6;
 }
 
-/* Top action row */
+/* Intro page */
+.intro-box {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 28px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+    margin-top: 1rem;
+}
+
+.intro-big {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.7rem;
+}
+
+.intro-text {
+    color: #b7c2d3;
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+.intro-pill {
+    display: inline-block;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(74,222,128,0.14);
+    color: #d6ffe2;
+    font-weight: 700;
+    margin-right: 8px;
+    margin-top: 8px;
+}
+
+/* Top action */
 .top-action {
     padding: 0.9rem 1rem;
     border-radius: 16px;
@@ -118,6 +160,73 @@ st.markdown("""
     border: 1px solid rgba(80,200,120,0.20);
     margin-bottom: 18px;
     box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+}
+
+/* Scene panel */
+.scene-panel {
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 22px;
+    padding: 22px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.09), rgba(34,197,94,0.07));
+    box-shadow: 0 10px 26px rgba(0,0,0,0.15);
+    margin-bottom: 18px;
+    min-height: 260px;
+}
+
+.scene-visual {
+    min-height: 155px;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 30% 30%, rgba(74,222,128,0.20), transparent 35%),
+        radial-gradient(circle at 70% 40%, rgba(96,165,250,0.25), transparent 35%),
+        linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.scene-visual::before {
+    content: "";
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.scene-emoji-big {
+    font-size: 4.5rem;
+    position: relative;
+    z-index: 2;
+    animation: floatEmoji 3.2s ease-in-out infinite;
+}
+
+.scene-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 0.4rem;
+}
+
+.scene-desc {
+    color: #b7c2d3;
+    line-height: 1.7;
+    font-size: 0.97rem;
+}
+
+@keyframes floatEmoji {
+    0% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-8px) scale(1.03); }
+    100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pulseGlow {
+    0% { transform: scale(0.92); opacity: 0.35; }
+    50% { transform: scale(1.06); opacity: 0.6; }
+    100% { transform: scale(0.92); opacity: 0.35; }
 }
 
 /* Story section */
@@ -246,20 +355,10 @@ div[data-testid="stProgressBar"] > div {
     border-radius: 999px;
 }
 
-/* Divider space */
 .story-gap {
     height: 8px;
 }
 </style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="hero-wrap">
-    <div class="main-title">🌿 The Resilience Game</div>
-    <div class="sub-title">
-        Choose a persona and guide them through real-life emotional situations while exploring different paths of resilience.
-    </div>
-</div>
 """, unsafe_allow_html=True)
 
 def clean_text(text: str) -> str:
@@ -371,6 +470,18 @@ def render_story_block(text: str):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+def render_scene_panel(persona_key):
+    p = PERSONAS[persona_key]
+    st.markdown(f"""
+    <div class="scene-panel">
+        <div class="scene-visual">
+            <div class="scene-emoji-big">{p['scene_emoji']}</div>
+        </div>
+        <div class="scene-title">{p['scene_title']}</div>
+        <div class="scene-desc">{p['scene_desc']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 if "started" not in st.session_state:
@@ -379,6 +490,43 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "selected_persona" not in st.session_state:
     st.session_state.selected_persona = None
+if "show_intro" not in st.session_state:
+    st.session_state.show_intro = True
+
+st.markdown("""
+<div class="hero-wrap">
+    <div class="main-title">🌿 The Resilience Game</div>
+    <div class="sub-title">
+        Choose a persona and guide them through real-life emotional situations while exploring different paths of resilience.
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Intro page
+if st.session_state.show_intro and not st.session_state.selected_persona:
+    st.markdown("""
+    <div class="intro-box">
+        <div class="intro-big">Welcome to the experience</div>
+        <div class="intro-text">
+            In this interactive story game, you will choose one persona and guide them through emotionally meaningful moments.
+            Each choice changes the direction of the story and reveals a different pattern of support, reflection, and resilience.
+            Aanya will walk with you through each scene.
+        </div>
+        <div style="margin-top:14px;">
+            <span class="intro-pill">5 Story Scenes</span>
+            <span class="intro-pill">3 Personas</span>
+            <span class="intro-pill">Branching Choices</span>
+            <span class="intro-pill">Final Reflection</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([1.4, 1, 1.4])
+    with c2:
+        if st.button("✨ Enter the Game", use_container_width=True):
+            st.session_state.show_intro = False
+            st.rerun()
+    st.stop()
 
 top_col1, top_col2 = st.columns([1, 5])
 with top_col1:
@@ -388,6 +536,7 @@ with top_col1:
         st.session_state.started = False
         st.session_state.history = []
         st.session_state.selected_persona = None
+        st.session_state.show_intro = True
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -425,6 +574,9 @@ else:
         """,
         unsafe_allow_html=True
     )
+
+# Scene panel before story starts
+render_scene_panel(st.session_state.selected_persona)
 
 if not st.session_state.started:
     st.markdown('<div class="section-title">Start the story</div>', unsafe_allow_html=True)
