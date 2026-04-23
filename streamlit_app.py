@@ -10,9 +10,9 @@ st.set_page_config(
 )
 
 # -----------------------------
-# CONFIG
+# FLOWISE CONFIG
 # -----------------------------
-FLOWISE_API_URL = "PASTE_YOUR_FLOWISE_API_URL_HERE"
+FLOWISE_API_URL = "https://cloud.flowiseai.com/api/v1/prediction/fd821f6f-939f-4b5c-89b4-910760fcb0f8"
 
 PERSONAS = {
     "Malik": {
@@ -210,9 +210,6 @@ st.markdown("""
 # HELPERS
 # -----------------------------
 def call_flowise(user_message: str) -> str:
-    """
-    Replace payload format if your Flowise endpoint expects something else.
-    """
     try:
         response = requests.post(
             FLOWISE_API_URL,
@@ -229,6 +226,8 @@ def call_flowise(user_message: str) -> str:
                 return data["response"]
             if "message" in data:
                 return data["message"]
+            if "answer" in data:
+                return data["answer"]
 
         return str(data)
 
@@ -282,9 +281,6 @@ def send_choice(choice_text: str):
         st.session_state.current_scene = extract_scene_number(response)
 
 def parse_choices(text: str):
-    """
-    Extract A/B/C choices from Flowise response.
-    """
     pattern = r"A\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*)"
     match = re.search(pattern, text, re.DOTALL)
     if match:
@@ -377,7 +373,6 @@ else:
     with left:
         st.markdown('<div class="story-panel">', unsafe_allow_html=True)
 
-        persona = st.session_state.selected_persona
         scene_text = clean_story_text(st.session_state.last_response)
         reflection_text = extract_reflection(scene_text)
 
@@ -462,6 +457,9 @@ else:
             restart_game()
             st.rerun()
 
+# -----------------------------
+# FOOTER
+# -----------------------------
 st.markdown(
     "<div class='footer-note'>Interactive wellness storytelling powered by Aanya 💚</div>",
     unsafe_allow_html=True
